@@ -14,6 +14,7 @@ export interface CreateServerOptions {
   version?: string;
   pathFilter?: PathFilter;
   frontmatterHandler?: FrontmatterHandler;
+  defaultExtension?: string;  // e.g. '.md' or '.markdown'; when unset, paths are passed through as-is
 }
 
 export function createServer(vaultPath: string, options: CreateServerOptions = {}): Server {
@@ -22,10 +23,11 @@ export function createServer(vaultPath: string, options: CreateServerOptions = {
     version = "0.0.0",
     pathFilter = new PathFilter(),
     frontmatterHandler = new FrontmatterHandler(),
+    defaultExtension,
   } = options;
 
   const resolvedVaultPath = resolve(vaultPath);
-  const fileSystem = new FileSystemService(resolvedVaultPath, pathFilter, frontmatterHandler);
+  const fileSystem = new FileSystemService(resolvedVaultPath, pathFilter, frontmatterHandler, defaultExtension);
   const searchService = new SearchService(resolvedVaultPath, pathFilter);
 
   const server = new Server({ name, version }, {

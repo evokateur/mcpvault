@@ -1455,3 +1455,47 @@ describe("classifyWriteError (#109)", () => {
     );
   });
 });
+
+// ============================================================================
+// NOTE EXTENSION TESTS
+// ============================================================================
+
+test("notePathOf: reads extensionless path as path+ext when defaultExtension is set", async () => {
+  const fs = new FileSystemService(testVaultPath, undefined, undefined, ".md");
+  await writeFile(join(testVaultPath, "note.md"), "# Hello");
+
+  const result = await fs.readNote("note");
+  expect(result.content).toContain("Hello");
+});
+
+test("notePathOf: writes extensionless path as path+ext when defaultExtension is set", async () => {
+  const fs = new FileSystemService(testVaultPath, undefined, undefined, ".md");
+
+  await fs.writeNote({ path: "new-note", content: "# New" });
+
+  const raw = await readFile(join(testVaultPath, "new-note.md"), "utf-8");
+  expect(raw).toContain("# New");
+});
+
+test("notePathOf: passes through path that already has an extension", async () => {
+  const fs = new FileSystemService(testVaultPath, undefined, undefined, ".md");
+  await writeFile(join(testVaultPath, "note.md"), "# Explicit");
+
+  const result = await fs.readNote("note.md");
+  expect(result.content).toContain("Explicit");
+});
+
+test("notePathOf: works with non-.md extension (.markdown)", async () => {
+  const fs = new FileSystemService(testVaultPath, undefined, undefined, ".markdown");
+  await writeFile(join(testVaultPath, "note.markdown"), "# Markdown");
+
+  const result = await fs.readNote("note");
+  expect(result.content).toContain("Markdown");
+});
+
+test("notePathOf: no defaultExtension leaves path unchanged", async () => {
+  await writeFile(join(testVaultPath, "note.md"), "# Plain");
+
+  const result = await fileSystem.readNote("note.md");
+  expect(result.content).toContain("Plain");
+});

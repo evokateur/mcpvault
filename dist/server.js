@@ -23,15 +23,16 @@ mcpvault v${VERSION}
 Universal AI bridge for Obsidian vaults - connect any MCP-compatible assistant
 
 Usage:
-  npx @bitbonsai/mcpvault [vault-path]
+  npx @bitbonsai/mcpvault [vault-path] [options]
 
 Arguments:
-  [vault-path]    Optional path to your Obsidian vault directory
-                  Defaults to current working directory when omitted
+  [vault-path]              Optional path to your Obsidian vault directory
+                            Defaults to current working directory when omitted
 
 Options:
-  --version, -v   Show version number
-  --help, -h      Show this help message
+  --note-ext <ext>          Infer this extension for extensionless note paths (e.g. .md, .markdown)
+  --version, -v             Show version number
+  --help, -h                Show this help message
 
 Examples:
   npx @bitbonsai/mcpvault
@@ -39,13 +40,25 @@ Examples:
   npx @bitbonsai/mcpvault ./Vault
   npx @bitbonsai/mcpvault /path/to/obsidian/vault
   npx @bitbonsai/mcpvault "/path/with spaces/Obsidian Vault"
+  npx @bitbonsai/mcpvault ~/Documents/MyVault --note-ext .md
 `);
     process.exit(0);
 }
+// Extract --note-ext flag before joining remaining args as vault path.
+let defaultExtension;
+const vaultArgs = [];
+for (let i = 0; i < cliArgs.length; i++) {
+    if (cliArgs[i] === '--note-ext' && i + 1 < cliArgs.length) {
+        defaultExtension = cliArgs[++i];
+    }
+    else {
+        vaultArgs.push(cliArgs[i]);
+    }
+}
 // Join trailing args to support vault paths with spaces.
 // When omitted, default to current working directory.
-const vaultPathArg = cliArgs.join(' ').trim();
+const vaultPathArg = vaultArgs.join(' ').trim();
 const vaultPath = resolve(vaultPathArg || process.cwd());
-const server = createServer(vaultPath, { version: VERSION });
+const server = createServer(vaultPath, { version: VERSION, ...(defaultExtension && { defaultExtension }) });
 const transport = new StdioServerTransport();
 await server.connect(transport);
