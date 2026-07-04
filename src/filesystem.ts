@@ -1,4 +1,4 @@
-import { join, resolve, relative, dirname } from 'path';
+import { join, resolve, relative, dirname, extname } from 'path';
 import { readdir, stat, readFile, writeFile, unlink, mkdir, access, rename, copyFile } from 'node:fs/promises';
 import { constants, realpathSync } from 'node:fs';
 import trash from 'trash';
@@ -42,7 +42,8 @@ export class FileSystemService {
   constructor(
     private vaultPath: string,
     pathFilter?: PathFilter,
-    frontmatterHandler?: FrontmatterHandler
+    frontmatterHandler?: FrontmatterHandler,
+    private defaultExtension?: string
   ) {
     const resolved = resolve(vaultPath);
     try {
@@ -53,6 +54,11 @@ export class FileSystemService {
     }
     this.pathFilter = pathFilter || new PathFilter();
     this.frontmatterHandler = frontmatterHandler || new FrontmatterHandler();
+  }
+
+  private notePathOf(path: string): string {
+    if (!this.defaultExtension || extname(path)) return path;
+    return `${path}${this.defaultExtension}`;
   }
 
   private resolvePath(relativePath: string): string {
@@ -117,14 +123,15 @@ export class FileSystemService {
   }
 
   async readNote(path: string): Promise<ParsedNote> {
-    const fullPath = this.resolvePath(path);
+    const notePath = this.notePathOf(path);
+    const fullPath = this.resolvePath(notePath);
 
-    if (!this.pathFilter.isAllowed(path)) {
+    if (!this.pathFilter.isAllowed(notePath)) {
       throw new Error(`Access denied: ${path}. This path is restricted (system files like .obsidian, .git, and dotfiles are not accessible).`);
     }
 
     // Check if the path is a directory first
-    const isDir = await this.isDirectory(path);
+    const isDir = await this.isDirectory(notePath);
     if (isDir) {
       throw new Error(`Cannot read directory as file: ${path}. Use list_directory tool instead.`);
     }
@@ -150,9 +157,10 @@ export class FileSystemService {
 
   async writeNote(params: NoteWriteParams): Promise<void> {
     const { path, content, frontmatter, mode = 'overwrite' } = params;
-    const fullPath = this.resolvePath(path);
+    const notePath = this.notePathOf(path);
+    const fullPath = this.resolvePath(notePath);
 
-    if (!this.pathFilter.isAllowed(path)) {
+    if (!this.pathFilter.isAllowed(notePath)) {
       throw new Error(`Access denied: ${path}. This path is restricted (system files like .obsidian, .git, and dotfiles are not accessible).`);
     }
 
@@ -225,8 +233,9 @@ export class FileSystemService {
 
   async patchNote(params: PatchNoteParams): Promise<PatchNoteResult> {
     const { path, oldString, newString, replaceAll = false } = params;
+    const notePath = this.notePathOf(path);
 
-    if (!this.pathFilter.isAllowed(path)) {
+    if (!this.pathFilter.isAllowed(notePath)) {
       return {
         success: false,
         path,
@@ -295,7 +304,7 @@ export class FileSystemService {
         : fullContent.replace(oldString, newString);
 
       // Write the updated content
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(notePath);
       await writeFile(fullPath, updatedContent, 'utf-8');
 
       return {
@@ -418,9 +427,10 @@ export class FileSystemService {
       };
     }
 
-    const fullPath = this.resolvePath(path);
+    const notePath = this.notePathOf(path);
+    const fullPath = this.resolvePath(notePath);
 
-    if (!this.pathFilter.isAllowed(path)) {
+    if (!this.pathFilter.isAllowed(notePath)) {
       return {
         success: false,
         path: path,
@@ -430,7 +440,7 @@ export class FileSystemService {
 
     try {
       // Check if it's a directory first (can't delete directories with this method)
-      const isDir = await this.isDirectory(path);
+      const isDir = await this.isDirectory(notePath);
       if (isDir) {
         return {
           success: false,
@@ -441,7 +451,7 @@ export class FileSystemService {
 
       if (trashMode === 'local') {
         const trashDir = join(this.vaultPath, '.trash');
-        const trashPath = join(trashDir, path);
+        const trashPath = join(trashDir, notePath);
 
         // Ensure trash directory exists
         await mkdir(dirname(trashPath), { recursive: true });
@@ -451,8 +461,8 @@ export class FileSystemService {
         try {
           await access(finalTrashPath, constants.F_OK);
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const ext = path.endsWith('.md') ? '.md' : '';
-          const base = ext ? path.slice(0, -ext.length) : path;
+          const ext = extname(notePath);
+          const base = ext ? notePath.slice(0, -ext.length) : notePath;
           const collidedPath = `${base}-${timestamp}${ext}`;
           finalTrashPath = join(trashDir, collidedPath);
         } catch {
@@ -513,8 +523,10 @@ export class FileSystemService {
 
   async moveNote(params: MoveNoteParams): Promise<MoveResult> {
     const { oldPath, newPath, overwrite = false } = params;
+    const oldNotePath = this.notePathOf(oldPath);
+    const newNotePath = this.notePathOf(newPath);
 
-    if (!this.pathFilter.isAllowed(oldPath)) {
+    if (!this.pathFilter.isAllowed(oldNotePath)) {
       return {
         success: false,
         oldPath,
@@ -523,7 +535,7 @@ export class FileSystemService {
       };
     }
 
-    if (!this.pathFilter.isAllowed(newPath)) {
+    if (!this.pathFilter.isAllowed(newNotePath)) {
       return {
         success: false,
         oldPath,
@@ -532,8 +544,8 @@ export class FileSystemService {
       };
     }
 
-    const oldFullPath = this.resolvePath(oldPath);
-    const newFullPath = this.resolvePath(newPath);
+    const oldFullPath = this.resolvePath(oldNotePath);
+    const newFullPath = this.resolvePath(newNotePath);
 
     try {
       // Read source content (will throw ENOENT if not found)
@@ -729,7 +741,8 @@ export class FileSystemService {
 
     const results = await Promise.allSettled(
       paths.map(async (path) => {
-        if (!this.pathFilter.isAllowed(path)) {
+        const notePath = this.notePathOf(path);
+        if (!this.pathFilter.isAllowed(notePath)) {
           throw new Error(`Access denied: ${path}. This path is restricted (system files like .obsidian, .git, and dotfiles are not accessible).`);
         }
 
@@ -770,8 +783,9 @@ export class FileSystemService {
 
   async updateFrontmatter(params: UpdateFrontmatterParams): Promise<void> {
     const { path, frontmatter, merge = true } = params;
+    const notePath = this.notePathOf(path);
 
-    if (!this.pathFilter.isAllowed(path)) {
+    if (!this.pathFilter.isAllowed(notePath)) {
       throw new Error(`Access denied: ${path}. This path is restricted (system files like .obsidian, .git, and dotfiles are not accessible).`);
     }
 
@@ -789,7 +803,7 @@ export class FileSystemService {
       throw new Error(`Invalid frontmatter: ${validation.errors.join(', ')}`);
     }
 
-    const fullPath = this.resolvePath(path);
+    const fullPath = this.resolvePath(notePath);
 
     if (merge && note.matter && note.matter.trim() !== '') {
       // Preserve raw formatting for unmodified fields
@@ -808,11 +822,12 @@ export class FileSystemService {
   async getNotesInfo(paths: string[]): Promise<NoteInfo[]> {
     const results = await Promise.allSettled(
       paths.map(async (path): Promise<NoteInfo> => {
-        if (!this.pathFilter.isAllowed(path)) {
+        const notePath = this.notePathOf(path);
+        if (!this.pathFilter.isAllowed(notePath)) {
           throw new Error(`Access denied: ${path}. This path is restricted (system files like .obsidian, .git, and dotfiles are not accessible).`);
         }
 
-        const fullPath = this.resolvePath(path);
+        const fullPath = this.resolvePath(notePath);
 
         let stats;
         try {
@@ -850,8 +865,9 @@ export class FileSystemService {
 
   async manageTags(params: TagManagementParams): Promise<TagManagementResult> {
     const { path, operation, tags = [] } = params;
+    const notePath = this.notePathOf(path);
 
-    if (!this.pathFilter.isAllowed(path)) {
+    if (!this.pathFilter.isAllowed(notePath)) {
       return {
         path,
         operation,
@@ -928,7 +944,7 @@ export class FileSystemService {
           note.content
         );
       }
-      const fullPath = this.resolvePath(path);
+      const fullPath = this.resolvePath(notePath);
       await writeFile(fullPath, updatedContent, 'utf-8');
 
       return {

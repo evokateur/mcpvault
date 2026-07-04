@@ -6,9 +6,9 @@ import { PathFilter } from "./pathfilter.js";
 import { SearchService } from "./search.js";
 import { resolve } from "path";
 export function createServer(vaultPath, options = {}) {
-    const { name = "mcpvault", version = "0.0.0", pathFilter = new PathFilter(), frontmatterHandler = new FrontmatterHandler(), } = options;
+    const { name = "mcpvault", version = "0.0.0", pathFilter = new PathFilter(), frontmatterHandler = new FrontmatterHandler(), defaultExtension, } = options;
     const resolvedVaultPath = resolve(vaultPath);
-    const fileSystem = new FileSystemService(resolvedVaultPath, pathFilter, frontmatterHandler);
+    const fileSystem = new FileSystemService(resolvedVaultPath, pathFilter, frontmatterHandler, defaultExtension);
     const searchService = new SearchService(resolvedVaultPath, pathFilter);
     const server = new Server({ name, version }, {
         capabilities: { tools: {} },

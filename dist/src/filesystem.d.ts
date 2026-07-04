@@ -13,9 +13,11 @@ import type { ParsedNote, DirectoryListing, NoteWriteParams, DeleteNoteParams, D
 export declare function classifyWriteError(error: unknown, path: string): Error;
 export declare class FileSystemService {
     private vaultPath;
+    private defaultExtension?;
     private frontmatterHandler;
     private pathFilter;
-    constructor(vaultPath: string, pathFilter?: PathFilter, frontmatterHandler?: FrontmatterHandler);
+    constructor(vaultPath: string, pathFilter?: PathFilter, frontmatterHandler?: FrontmatterHandler, defaultExtension?: string | undefined);
+    private notePathOf;
     private resolvePath;
     readNote(path: string): Promise<ParsedNote>;
     writeNote(params: NoteWriteParams): Promise<void>;

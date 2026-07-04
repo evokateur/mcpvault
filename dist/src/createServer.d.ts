@@ -6,6 +6,7 @@ export interface CreateServerOptions {
     version?: string;
     pathFilter?: PathFilter;
     frontmatterHandler?: FrontmatterHandler;
+    defaultExtension?: string;
 }
 export declare function createServer(vaultPath: string, options?: CreateServerOptions): Server;
 //# sourceMappingURL=createServer.d.ts.map
